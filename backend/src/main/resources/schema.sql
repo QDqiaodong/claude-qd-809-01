@@ -3,6 +3,7 @@
 SET NAMES utf8mb4;
 
 -- ========================= 建表 =========================
+DROP TABLE IF EXISTS test_retest_round;
 DROP TABLE IF EXISTS reaction_ledger;
 DROP TABLE IF EXISTS reaction_bag_link;
 DROP TABLE IF EXISTS transfusion_reaction;
@@ -81,6 +82,29 @@ CREATE TABLE test_sample (
     KEY idx_sample_status (status),
     CONSTRAINT fk_sample_collection FOREIGN KEY (collection_id) REFERENCES collection_record (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='标本检验';
+
+-- 标本复测轮次（每轮只复测一个项目；test_sample 上的初检值视为第 0 轮，永不覆盖）
+-- decision PENDING 待复核 / ADOPTED 采用（本轮为该项目当前有效结果）/ REJECTED 拒绝（沿用上一有效轮）
+CREATE TABLE test_retest_round (
+    id               BIGINT       NOT NULL AUTO_INCREMENT,
+    sample_id        BIGINT       NOT NULL COMMENT '标本',
+    item_code        VARCHAR(16)  NOT NULL COMMENT '复测项目 ALT/HB/HBV/HCV/HIV/SYPHILIS',
+    round_no         INT          NOT NULL COMMENT '该项目复测轮次，从 1 开始',
+    new_value        DECIMAL(6,2) NULL COMMENT '新数值结果（ALT/血红蛋白）',
+    new_result       VARCHAR(8)   NULL COMMENT '新阴阳性结果（HBV/HCV/HIV/梅毒 NEGATIVE/POSITIVE）',
+    reason           VARCHAR(512) NOT NULL COMMENT '复测原因',
+    operator         VARCHAR(32)  NOT NULL COMMENT '复测检测人',
+    tested_at        DATETIME     NOT NULL COMMENT '复测时间',
+    decision         VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING 待复核/ADOPTED 采用/REJECTED 拒绝',
+    decision_reason  VARCHAR(512) NULL COMMENT '复核人采用或拒绝的理由',
+    reviewer         VARCHAR(32)  NULL COMMENT '放行复核人',
+    reviewed_at      DATETIME     NULL COMMENT '复核（放行）时间',
+    created_at       DATETIME     NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_retest_round (sample_id, item_code, round_no),
+    KEY idx_retest_sample (sample_id),
+    CONSTRAINT fk_retest_sample FOREIGN KEY (sample_id) REFERENCES test_sample (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='标本复测轮次';
 
 -- 成分制备批次
 CREATE TABLE preparation_batch (
@@ -325,11 +349,15 @@ INSERT INTO test_sample (barcode, collection_id, donor_name, blood_type, alt_val
 ('S20260005', 3, '陈昊', 'O+', 21.5, 138.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', NULL, 'TESTING', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), NULL, DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260006', 6, '李静', 'A-', 18.2, 131.5, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', NULL, 'TESTING', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), NULL, DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260007', 7, '周琳', 'AB-', 26.8, 129.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', NULL, 'TESTING', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), NULL, DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
-('S20260008', 9, '吴斌', 'A+', 19.4, 142.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', '林岚', 'RELEASED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
+('S20260008', 9, '吴斌', 'A+', 44.7, 142.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', '林岚', 'RELEASED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260009', 10, '郑霞', 'B+', 22.1, 136.5, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', '林岚', 'RELEASED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260010', 11, '郑霞', 'B+', 17.6, 128.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', '邵华', 'RELEASED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260011', 12, '何雨', 'AB+', 24.3, 145.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', '邵华', 'RELEASED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260012', 13, '王强', 'B+', 88.6, 133.0, 'NEGATIVE', 'POSITIVE', 'NEGATIVE', 'NEGATIVE', '林岚', 'SCRAPPED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), NULL, DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE));
+
+-- 复测轮次（演示用：标本 S20260008 初检 ALT 44.7 偏高判废，复测 21.0 合格，复核人采用后放行；初检值不覆盖）
+INSERT INTO test_retest_round (sample_id, item_code, round_no, new_value, new_result, reason, operator, tested_at, decision, decision_reason, reviewer, reviewed_at, created_at) VALUES
+(8, 'ALT', 1, 21.0, NULL, '更换 ALT 试剂并做质控后，同管血样上机复测，排除首检仪器漂移', '检验 韩梅', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '14:05' HOUR_MINUTE), 'ADOPTED', '复测在控、有质控记录，采用复测值 21.0 U/L 放行；初检 44.7 不覆盖，留档追溯', '林岚', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '14:05' HOUR_MINUTE));
 
 -- 成分制备批次（8 批，均由标本放行后自动生成）
 INSERT INTO preparation_batch (batch_no, collection_id, collect_no, blood_type, rbc_bags, rbc_volume_ml, plasma_bags, plasma_volume_ml, platelet_bags, platelet_volume_ml, cryo_bags, cryo_volume_ml, operator, prepared_time, status, created_at) VALUES

@@ -36,8 +36,9 @@ export const abnormalCollect = (id) => http.post(`/collections/${id}/abnormal`)
 /* ===================== 标本检验与成分制备 ===================== */
 export const getSamples = (bloodType) => http.get('/lab/samples', qs({ bloodType }))
 export const inputResult = (id, data) => http.post(`/lab/samples/${id}/result`, data)
-export const releaseSample = (id, reviewer) =>
-  http.post(`/lab/samples/${id}/release`, { reviewer })
+export const retestSample = (id, data) => http.post(`/lab/samples/${id}/retest`, data)
+export const releaseSample = (id, reviewer, decisions) =>
+  http.post(`/lab/samples/${id}/release`, { reviewer, decisions })
 export const moveSample = (id, status, reviewer) =>
   http.post('/lab/samples/' + id + '/move', null, qs({ status, reviewer }))
 export const getPreparations = (bloodType) => http.get('/lab/preparations', qs({ bloodType }))

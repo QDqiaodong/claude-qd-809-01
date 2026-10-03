@@ -31,6 +31,7 @@ import com.blood.center.domain.ReactionBagLink;
 import com.blood.center.domain.ReactionLedger;
 import com.blood.center.domain.ScrapRecord;
 import com.blood.center.domain.TestSample;
+import com.blood.center.domain.TestRetestRound;
 import com.blood.center.domain.TransfusionReaction;
 import com.blood.center.dto.ReactionLedgerVO;
 import com.blood.center.dto.ReactionLinkVO;
@@ -47,6 +48,7 @@ import com.blood.center.repository.ReactionBagLinkRepository;
 import com.blood.center.repository.ReactionLedgerRepository;
 import com.blood.center.repository.ReactionRepository;
 import com.blood.center.repository.ScrapRecordRepository;
+import com.blood.center.repository.TestRetestRoundRepository;
 import com.blood.center.repository.TestSampleRepository;
 
 /**
@@ -75,6 +77,8 @@ public class ReactionService {
     private final BloodBagRepository bagRepository;
     private final PreparationBatchRepository preparationRepository;
     private final TestSampleRepository sampleRepository;
+    private final TestRetestRoundRepository retestRepository;
+    private final SampleResultResolver resultResolver;
     private final ScrapRecordRepository scrapRepository;
     private final InventoryService inventoryService;
     private final ReactionService self;
@@ -87,6 +91,7 @@ public class ReactionService {
                            ReactionLedgerRepository ledgerRepository, CrossMatchRepository matchRepository,
                            BloodBagRepository bagRepository,
                            PreparationBatchRepository preparationRepository, TestSampleRepository sampleRepository,
+                           TestRetestRoundRepository retestRepository, SampleResultResolver resultResolver,
                            ScrapRecordRepository scrapRepository, InventoryService inventoryService,
                            @Lazy ReactionService self, ApplicationEventPublisher eventPublisher) {
         this.reactionRepository = reactionRepository;
@@ -96,6 +101,8 @@ public class ReactionService {
         this.bagRepository = bagRepository;
         this.preparationRepository = preparationRepository;
         this.sampleRepository = sampleRepository;
+        this.retestRepository = retestRepository;
+        this.resultResolver = resultResolver;
         this.scrapRepository = scrapRepository;
         this.inventoryService = inventoryService;
         this.self = self;
@@ -806,10 +813,15 @@ public class ReactionService {
                         collection.getStatus(), BloodDict.collectionStatusName(collection.getStatus()));
                 TestSample sample = sampleRepository.findByCollectionId(collection.getId()).orElse(null);
                 if (sample != null) {
+                    // 溯源展示与放行口径一致：取各项目最后一次有效（被采用）复测结果
+                    List<TestRetestRound> sampleRounds =
+                            retestRepository.findBySampleIdOrderByItemCodeAscRoundNoAsc(sample.getId());
+                    SampleResultResolver.Snapshot sampleSnapshot =
+                            resultResolver.effectiveAtRelease(sample, sampleRounds);
                     sampleVO = new TraceBagVO.Sample(sample.getId(), sample.getBarcode(), sample.getBloodType(),
-                            decimal(sample.getAltValue()), decimal(sample.getHbValue()),
-                            resultName(sample.getHbvResult()), resultName(sample.getHcvResult()),
-                            resultName(sample.getHivResult()), resultName(sample.getSyphilisResult()),
+                            decimal(sampleSnapshot.altValue()), decimal(sampleSnapshot.hbValue()),
+                            resultName(sampleSnapshot.hbvResult()), resultName(sampleSnapshot.hcvResult()),
+                            resultName(sampleSnapshot.hivResult()), resultName(sampleSnapshot.syphilisResult()),
                             sample.getReviewer(), sample.getStatus(),
                             BloodDict.sampleStatusName(sample.getStatus()), sample.getTestedAt(),
                             sample.getReleasedAt());

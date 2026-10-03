@@ -152,6 +152,20 @@ public final class BloodDict {
             "NEGATIVE", "阴性",
             "POSITIVE", "阳性");
 
+    /** 六个检验项目编码（复测一轮只针对其中一个项目） */
+    public static final List<String> TEST_ITEMS = List.of("ALT", "HB", "HBV", "HCV", "HIV", "SYPHILIS");
+
+    private static final Map<String, String> TEST_ITEM_NAME = Map.of(
+            "ALT", "ALT",
+            "HB", "血红蛋白",
+            "HBV", "HBV",
+            "HCV", "HCV",
+            "HIV", "HIV",
+            "SYPHILIS", "梅毒");
+
+    /** 数值型项目（取 newValue）；其余为阴阳性项目（取 newResult） */
+    private static final List<String> NUMERIC_TEST_ITEMS = List.of("ALT", "HB");
+
     // ---------------- 取值方法 ----------------
 
     public static boolean isValidBloodType(String bloodType) {
@@ -272,5 +286,18 @@ public final class BloodDict {
 
     public static boolean isValidSampleStatus(String status) {
         return status != null && SAMPLE_STATUS.containsKey(status);
+    }
+
+    public static boolean isValidTestItem(String itemCode) {
+        return itemCode != null && TEST_ITEM_NAME.containsKey(itemCode);
+    }
+
+    public static String testItemName(String itemCode) {
+        return itemCode == null ? "" : TEST_ITEM_NAME.getOrDefault(itemCode, itemCode);
+    }
+
+    /** ALT / 血红蛋白走数值结果，其余四项走阴阳性结果 */
+    public static boolean isNumericTestItem(String itemCode) {
+        return NUMERIC_TEST_ITEMS.contains(itemCode);
     }
 }

@@ -14,6 +14,7 @@ import com.blood.center.common.ApiResponse;
 import com.blood.center.dto.PreparationSummaryVO;
 import com.blood.center.dto.PreparationVO;
 import com.blood.center.dto.ReleaseRequest;
+import com.blood.center.dto.RetestRequest;
 import com.blood.center.dto.SampleVO;
 import com.blood.center.dto.TestResultRequest;
 import com.blood.center.service.LabService;
@@ -37,10 +38,16 @@ public class LabController {
         return ApiResponse.success(labService.listSamples(bloodType));
     }
 
-    /** 录入六项检验结果 */
+    /** 录入六项检验结果（初检 / 第 0 轮；已有复测轮后冻结） */
     @PostMapping("/samples/{id}/result")
     public ApiResponse<SampleVO> inputResult(@PathVariable Long id, @RequestBody TestResultRequest request) {
         return ApiResponse.success("检验结果已录入", labService.inputResult(id, request));
+    }
+
+    /** 发起复测：单项目一轮，填写新结果与复测原因；原结果不覆盖 */
+    @PostMapping("/samples/{id}/retest")
+    public ApiResponse<SampleVO> retest(@PathVariable Long id, @RequestBody RetestRequest request) {
+        return ApiResponse.success("复测已记录为新一轮结果", labService.retest(id, request));
     }
 
     /** 标本放行（指定复核人）→ 领域事件自动生成成分制备单 */
