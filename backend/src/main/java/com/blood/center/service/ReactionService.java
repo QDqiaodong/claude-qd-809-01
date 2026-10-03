@@ -1,6 +1,5 @@
 package com.blood.center.service;
 
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
@@ -29,6 +28,7 @@ import com.blood.center.domain.Donor;
 import com.blood.center.domain.PreparationBatch;
 import com.blood.center.domain.ReactionBagLink;
 import com.blood.center.domain.ReactionLedger;
+import com.blood.center.domain.SampleRetest;
 import com.blood.center.domain.ScrapRecord;
 import com.blood.center.domain.TestSample;
 import com.blood.center.domain.TransfusionReaction;
@@ -46,6 +46,7 @@ import com.blood.center.repository.PreparationBatchRepository;
 import com.blood.center.repository.ReactionBagLinkRepository;
 import com.blood.center.repository.ReactionLedgerRepository;
 import com.blood.center.repository.ReactionRepository;
+import com.blood.center.repository.SampleRetestRepository;
 import com.blood.center.repository.ScrapRecordRepository;
 import com.blood.center.repository.TestSampleRepository;
 
@@ -75,6 +76,7 @@ public class ReactionService {
     private final BloodBagRepository bagRepository;
     private final PreparationBatchRepository preparationRepository;
     private final TestSampleRepository sampleRepository;
+    private final SampleRetestRepository retestRepository;
     private final ScrapRecordRepository scrapRepository;
     private final InventoryService inventoryService;
     private final ReactionService self;
@@ -87,6 +89,7 @@ public class ReactionService {
                            ReactionLedgerRepository ledgerRepository, CrossMatchRepository matchRepository,
                            BloodBagRepository bagRepository,
                            PreparationBatchRepository preparationRepository, TestSampleRepository sampleRepository,
+                           SampleRetestRepository retestRepository,
                            ScrapRecordRepository scrapRepository, InventoryService inventoryService,
                            @Lazy ReactionService self, ApplicationEventPublisher eventPublisher) {
         this.reactionRepository = reactionRepository;
@@ -96,6 +99,7 @@ public class ReactionService {
         this.bagRepository = bagRepository;
         this.preparationRepository = preparationRepository;
         this.sampleRepository = sampleRepository;
+        this.retestRepository = retestRepository;
         this.scrapRepository = scrapRepository;
         this.inventoryService = inventoryService;
         this.self = self;
@@ -806,10 +810,13 @@ public class ReactionService {
                         collection.getStatus(), BloodDict.collectionStatusName(collection.getStatus()));
                 TestSample sample = sampleRepository.findByCollectionId(collection.getId()).orElse(null);
                 if (sample != null) {
+                    // 溯源链展示与放行判定同一口径：各项目最后一次有效结果（初检 + 未被拒绝的复测）
+                    List<SampleRetest> rounds = retestRepository.findBySampleIdOrderByIdAsc(sample.getId());
+                    LabService.EffectiveResults effective = LabService.effectiveResults(sample, rounds);
                     sampleVO = new TraceBagVO.Sample(sample.getId(), sample.getBarcode(), sample.getBloodType(),
-                            decimal(sample.getAltValue()), decimal(sample.getHbValue()),
-                            resultName(sample.getHbvResult()), resultName(sample.getHcvResult()),
-                            resultName(sample.getHivResult()), resultName(sample.getSyphilisResult()),
+                            effective.alt(), effective.hb(),
+                            resultName(effective.hbv()), resultName(effective.hcv()),
+                            resultName(effective.hiv()), resultName(effective.syphilis()),
                             sample.getReviewer(), sample.getStatus(),
                             BloodDict.sampleStatusName(sample.getStatus()), sample.getTestedAt(),
                             sample.getReleasedAt());
@@ -832,10 +839,6 @@ public class ReactionService {
                 match.getResult(), BloodDict.matchResultName(match.getResult()), match.getIssueOperator(),
                 match.getIssueTime(), match.getRecoveryChecked());
         return new TraceChainVO(issueVO, bagVO, batchVO, collectionVO, sampleVO, blockHint);
-    }
-
-    private String decimal(BigDecimal value) {
-        return value == null ? null : value.stripTrailingZeros().toPlainString();
     }
 
     private String resultName(String result) {

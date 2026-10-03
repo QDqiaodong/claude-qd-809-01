@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS scrap_record;
 DROP TABLE IF EXISTS blood_bag;
 DROP TABLE IF EXISTS blood_inventory;
 DROP TABLE IF EXISTS preparation_batch;
+DROP TABLE IF EXISTS sample_retest;
 DROP TABLE IF EXISTS test_sample;
 DROP TABLE IF EXISTS collection_record;
 DROP TABLE IF EXISTS donor;
@@ -81,6 +82,28 @@ CREATE TABLE test_sample (
     KEY idx_sample_status (status),
     CONSTRAINT fk_sample_collection FOREIGN KEY (collection_id) REFERENCES collection_record (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='标本检验';
+
+-- 标本复测轮次（原直接录入结果保留在 test_sample 各列，复测只新增轮次行，绝不覆盖；
+--  uk_retest_round 保证并发发起同一项目复测时只有一轮能落库）
+CREATE TABLE sample_retest (
+    id           BIGINT       NOT NULL AUTO_INCREMENT,
+    sample_id    BIGINT       NOT NULL COMMENT '标本',
+    item_code    VARCHAR(16)  NOT NULL COMMENT '复测项目 ALT/HB/HBV/HCV/HIV/SYPHILIS',
+    round_no     INT          NOT NULL COMMENT '复测轮次：同一项目从 1 开始递增',
+    result_value VARCHAR(32)  NOT NULL COMMENT '新结果：数值（ALT/血红蛋白）或 NEGATIVE/POSITIVE',
+    conclusion   VARCHAR(16)  NOT NULL COMMENT 'QUALIFIED 合格/UNQUALIFIED 不合格',
+    reason       VARCHAR(255) NOT NULL COMMENT '复测原因',
+    operator     VARCHAR(32)  NOT NULL COMMENT '检测人员',
+    adopted      TINYINT(1)   NULL COMMENT '复核定夺：1 采用/0 拒绝/NULL 待复核',
+    adopt_reason VARCHAR(255) NULL COMMENT '复核人采用或拒绝复测结果的理由',
+    reviewer     VARCHAR(32)  NULL COMMENT '复核人',
+    reviewed_at  DATETIME     NULL COMMENT '复核时间',
+    created_at   DATETIME     NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_retest_round (sample_id, item_code, round_no),
+    KEY idx_retest_sample (sample_id, id),
+    CONSTRAINT fk_retest_sample FOREIGN KEY (sample_id) REFERENCES test_sample (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='标本复测轮次';
 
 -- 成分制备批次
 CREATE TABLE preparation_batch (
@@ -330,6 +353,10 @@ INSERT INTO test_sample (barcode, collection_id, donor_name, blood_type, alt_val
 ('S20260010', 11, '郑霞', 'B+', 17.6, 128.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', '邵华', 'RELEASED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260011', 12, '何雨', 'AB+', 24.3, 145.0, 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', 'NEGATIVE', '邵华', 'RELEASED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '15:40' HOUR_MINUTE), DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE)),
 ('S20260012', 13, '王强', 'B+', 88.6, 133.0, 'NEGATIVE', 'POSITIVE', 'NEGATIVE', 'NEGATIVE', '林岚', 'SCRAPPED', DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '10:20' HOUR_MINUTE), NULL, DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '9:5' HOUR_MINUTE));
+
+-- 标本复测轮次（S20260012 初检 ALT 88.6 超标，复测一轮 ALT 合格待复核；HCV 仍为阳性，当前判定仍不合格，标本保持报废）
+INSERT INTO sample_retest (sample_id, item_code, round_no, result_value, conclusion, reason, operator, adopted, adopt_reason, reviewer, reviewed_at, created_at) VALUES
+(12, 'ALT', 1, '38.5', 'QUALIFIED', '初检前献血者剧烈运动致 ALT 一过性升高，休息 30 分钟后复测', '林岚', NULL, NULL, NULL, NULL, DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 0 DAY), INTERVAL '11:10' HOUR_MINUTE));
 
 -- 成分制备批次（8 批，均由标本放行后自动生成）
 INSERT INTO preparation_batch (batch_no, collection_id, collect_no, blood_type, rbc_bags, rbc_volume_ml, plasma_bags, plasma_volume_ml, platelet_bags, platelet_volume_ml, cryo_bags, cryo_volume_ml, operator, prepared_time, status, created_at) VALUES

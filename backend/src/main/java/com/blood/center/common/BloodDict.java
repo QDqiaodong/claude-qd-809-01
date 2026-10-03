@@ -152,6 +152,20 @@ public final class BloodDict {
             "NEGATIVE", "阴性",
             "POSITIVE", "阳性");
 
+    /** 六项检验项目（复测按项目发起） */
+    private static final Map<String, String> TEST_ITEM = Map.of(
+            "ALT", "ALT",
+            "HB", "血红蛋白",
+            "HBV", "HBV",
+            "HCV", "HCV",
+            "HIV", "HIV",
+            "SYPHILIS", "梅毒");
+
+    /** 复测单轮判定 */
+    private static final Map<String, String> RETEST_CONCLUSION = Map.of(
+            "QUALIFIED", "合格",
+            "UNQUALIFIED", "不合格");
+
     // ---------------- 取值方法 ----------------
 
     public static boolean isValidBloodType(String bloodType) {
@@ -251,6 +265,18 @@ public final class BloodDict {
 
     public static String testResultName(String result) {
         return result == null ? "" : TEST_RESULT.getOrDefault(result, result);
+    }
+
+    public static boolean isValidTestItem(String itemCode) {
+        return itemCode != null && TEST_ITEM.containsKey(itemCode);
+    }
+
+    public static String testItemName(String itemCode) {
+        return itemCode == null ? "" : TEST_ITEM.getOrDefault(itemCode, itemCode);
+    }
+
+    public static String retestConclusionName(String conclusion) {
+        return conclusion == null ? "" : RETEST_CONCLUSION.getOrDefault(conclusion, conclusion);
     }
 
     public static boolean isValidComponent(String component) {
